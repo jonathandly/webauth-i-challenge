@@ -5,6 +5,9 @@
   "repository": "git@github.com:jonathandly/webauth-i-challenge.git",
   "author": "Jonathan Daly <dalyj138@gmail.com>",
   "license": "MIT",
+  "scripts": {
+    "server": "nodemon index.js"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

@@ -10,6 +10,6 @@ module.exports = {
     useNullAsDefault: true,
   },
     migrations: {
-      tableName: './data/migrations'
+      tableName: './migrations'
     },
 };
