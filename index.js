@@ -3,15 +3,38 @@ const cors = require('cors');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 
-const db = require('./data/dbConfig');
+const session = require('express-session');
+const SessionStore = require('connect-session-knex')(session);
+
+// const db = require('./data/dbConfig');
 const Users = require('./users/users-model.js');
 
 
 const server = express();
 
+const sessionConfig = {
+    name: 'osiris',
+    secret: 'who are you',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        maxAge: 60 * 60 * 1000,
+        secure: false,
+        httpOnly: true,
+    },
+    store: new SessionStore({
+        knex: require('./data/dbConfig'),
+        tablename: 'sessions',
+        sidfieldname: 'sid',
+        createtable: true,
+        clearInterval: 60 * 60 * 1000,
+    }),
+}
+
+server.use(session(sessionConfig));
 server.use(helmet());
-server.use(cors());
 server.use(express.json());
+server.use(cors());
 
 server.get('/', (req, res) => {
     res.send('It works for now');
@@ -49,9 +72,11 @@ server.post('/api/login', (req, res) => {
             const isValid = bcrypt.compareSync(password, user.password);
 
             if(user && isValid) {
-                res.status(200).json({ message: `Welcome ${user.username}!` });
+                req.session.user = user;
+
+                res.status(200).json({ message: `Welcome ${user.username}! User ${user.id} is logged in` });
             } else {
-                res.status(401).json({ message: 'Invalid Credentials' });
+                res.status(401).json({ message: 'You shall not pass' });
             }
         })
         .catch(err => {
@@ -59,15 +84,33 @@ server.post('/api/login', (req, res) => {
         });
 });
 
-server.get('/api/users', authorize, (req, res) => {
+server.get('/api/users', restricted, (req, res) => {
     Users.find()
         .then(users => {
-            res.json(users);
+            if(!users) {
+                res.status(401).json({ message: 'You shall not pass' });
+            } else {
+                res.json(users);
+            }
+            
         })
         .catch(err => {
             res.send(err);
         });
 });
+
+server.get('/api/logout', restricted, (req, res) => {
+    req.session.destroy((err) => {
+        if(err) {
+            console.log(err);
+            res.status(500).json({ message: 'There was an error!' });
+        }
+
+        res.end();
+    });
+});
+
+
 
 function authorize(req, res, next) {
     const username = req.headers['x-username'];
@@ -89,6 +132,14 @@ function authorize(req, res, next) {
         .catch(err => {
             res.status(500).json(err);
         });
+}
+
+function restricted(req, res, next) {
+    if(req.session && req.session.user) {
+        next();
+    } else {
+        res.status(401).json({ message: 'You shall not pass' });
+    }
 }
 
 const port = process.env.PORT || 5555;
